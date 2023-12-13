@@ -185,7 +185,7 @@ class Buffer:
 def main():
     parser = OptionParser()
     parser.add_option("-z", "--twelite", dest="twelite",
-                      help="TWELITE Device path", default='/dev/ttyUSB1')
+                      help="TWELITE Device path", default='/dev/ttyUSB0')
     parser.add_option("-b", "--baudrate", dest="baudrate",
                       help="TWELITE Baud Rate", default=115200)
 #                      help="TWELITE Baud Rate", default=38400)
@@ -236,9 +236,9 @@ def main():
     b = Buffer()
     logger.info('buffer created!')
     while(1):
-        logger.info('try read...')
+        # logger.info('try read...')
         x = ser.read(1)
-        logger.info('read! {:#02x}'.format(x[0]))
+        # logger.info('read! {:#02x}'.format(x[0]))
 
         b.process(x)
         # if(b._stat == "dt"):
