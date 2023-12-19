@@ -85,7 +85,6 @@ def GenPkt( address, ID, number ):
 # in - end of message 0x04
 
 class Consts:
-    IDX_DATA_START = 18
     IDX_MLEN_START = 2
     IDX_MLEN_END = 3
     IDX_SENDER_STD_ADDR = 4
@@ -248,17 +247,20 @@ def main():
         #           .format(x, b._buff[-1], b._stat , b._mcnt, b._mlen, b._dcnt, b._dlen))
         if(b.isComplete()):
             (cmd, data) = b.getDataAndCmd()
-            printx(data)
+            # printx(data)
             if(len(data) < 1):
                 logger.info('complete but data is 0!')
                 continue
 
             if(cmd == Commands.CMD_WRITE_REQUEST):
-                dt.clear()
+                # dt.clear()
+                # dt = bytearray()
                 seq_len = data[0] << 8
                 seq_len |= data[1]
-                dt += data[2:]
+                # dt += data[2:]
+                dt = data[2:]
                 logger.info("seq_len:{}".format(seq_len))
+                printx(data[2:])
             elif(cmd == Commands.CMD_WRITE_DATA and len(dt) > 0):
                 msg_seq = data[0] << 8
                 msg_seq |= data[1]
@@ -270,6 +272,7 @@ def main():
                 dt += data[2:]
                 logger.info("msg_seq:{}/{}".format(msg_seq, seq_len))
                 logger.info('complete:{}'.format(len(dt)))
+                printx(dt[2:12])
                 sz = 0
                 w = 0
                 h = 0
@@ -277,9 +280,9 @@ def main():
                 sz |= dt[1] << 16
                 sz |= dt[2] << 8
                 sz |= dt[3]
-                w  |= dt[4] << 9
+                w  |= dt[4] << 8
                 w  |= dt[5]
-                h  |= dt[6] << 9
+                h  |= dt[6] << 8
                 h  |= dt[7]
 
                 logger.info('image_size:{} {}'.format(sz, type(sz)))
@@ -303,6 +306,7 @@ def main():
                 img = img.convert("RGB")
                 fname_j = "{}/image_{}.jpg".format(data_path, ts)
                 img.save(fname_j)
+                logger.info("save image:{}".format(fname_j))
 
                 dt.clear()
 
