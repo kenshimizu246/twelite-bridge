@@ -265,7 +265,9 @@ def main():
                 msg_seq = data[0] << 8
                 msg_seq |= data[1]
                 dt += data[2:]
-                logger.info("msg_seq:{}/{}".format(msg_seq, seq_len))
+                if((seq_len - msg_seq) < 50):
+                    logger.info("msg_seq:{}/{}".format(msg_seq, seq_len))
+                # logger.info("msg_seq:{}/{}".format(msg_seq, seq_len))
             elif(cmd == Commands.CMD_WRITE_DONE and len(dt) > 0):
                 msg_seq = data[0] << 8
                 msg_seq |= data[1]
