@@ -88,7 +88,7 @@ class Consts:
     IDX_MLEN_START = 2
     IDX_MLEN_END = 3
     IDX_SENDER_STD_ADDR = 4
-    IDX_CMD = 5
+    IDX_A0 = 5
     IDX_RESP_ID = 6
     IDX_FROM_ADDR_START = 7
     IDX_FROM_ADDR_END = 10
@@ -99,6 +99,35 @@ class Consts:
     IDX_DATA_SIZE_END = 17
     IDX_DATA_START = 18
 
+
+def create_ext_msg(address, seq, cmd, params, data):
+    ll = len(data) + 1 + len(params)
+    data_len = (11 - 4) + ll
+    # s = 11 + ll + 1
+    p = pack('>BBBBBBBBBBB', 0xA5, 0x5A, 0x80, data_len, address, 0xA0, seq, 0x01, 0x02, 0x0A, 0xFF)
+    p += pack('>B', cmd)
+    for x in params:
+        p += pack('>B', x)
+    if(data):
+        p += data
+    x = 0
+    for i in range(0, len(p)):
+        # print("{:#02x}".format(p[i]), end=', ')
+        # print("{}:{:#02x}".format(i, p[i]))
+        if(i > 3):
+            x ^= p[i]
+    print("")
+    print("x:{:#02x}".format(x))
+    p += pack('>B', x)
+    return p
+
+
+def checksum(data):
+    x = 0;
+    for i in range(0, len(data)):
+        x ^= data[i]
+    return x
+
 class Buffer:
     def __init__(self):
         self.init()
@@ -108,6 +137,7 @@ class Buffer:
         self._dcnt = 0
         self._mlen = 0
         self._dlen = 0
+        self._checksum = None
         self._stat = 'in'
         self._resp_id = None
         self._buff = bytearray()
@@ -152,6 +182,12 @@ class Buffer:
                 if(self._dcnt == self._dlen):
                     self._stat = 'cs' # checksum
             elif(self._stat == 'cs'):
+                self._checksum = x[0]
+                self._checksum_status = (checksum(self._buff[4:]) == x[0])
+                if(not self._checksum_status):
+                    logger.info("checksumx:{:#02x}:{:#02x}".format(x[0], self._checksum))
+                self._stat = 'tm'
+            elif(self._stat == 'tm'):
                 if(x[0] == 0x04):
                     self._stat = 'in'
                     self._complete = True
@@ -170,11 +206,25 @@ class Buffer:
         idx_end = Consts.IDX_DATA_START + self._dlen
         return (self._buff[idx_cmd], self._buff[idx_start:idx_end])
 
+    def getRawData(self):
+        return self._buff
+
     def getRespID(self):
         return self._buff[Consts.IDX_RESP_ID]
 
+    def getAddress(self):
+        return self._buff[Consts.IDX_SENDER_STD_ADDR]
+
     def isComplete(self):
         return self._complete
+
+    def create_resp_msg(self):
+        address = self.getAddress()
+        seq = self.getRespID()
+        cmd = Commands.CMD_WRITE_DATA_ACK
+        params = None
+        data = None
+        # msg = create_ext_msg(address, seq, cmd, params, data)
 
     def toString(self):
         print("_mcnt:{} _dcnt:{} _mlen:{} _dlen:{} _stat:{} _resp_id:{} _buff:{} _complete:{}"
@@ -231,18 +281,21 @@ def main():
 
     seq = 0
 
+    stats = {}
     dt = bytearray()
     b = Buffer()
     logger.info('buffer created!')
     while(1):
         # logger.info('try read...')
         x = ser.read(1)
-        # logger.info('read! {:#02x}'.format(x[0]))
+        # if(len(dt) > 6000):
+        #     logger.info("read! {:#02x}".format(x[0]))
 
         b.process(x)
         # if(b._stat == "dt"):
         #     logger.info("stat[{}]:{}".format(b.getRespID(), b._stat))
         # if(b._stat == "dt"):
+        # if(len(dt) > 6000):
         #     logger.info("process[{}:{:#02x}]:{} {}/{} {}/{}"
         #           .format(x, b._buff[-1], b._stat , b._mcnt, b._mlen, b._dcnt, b._dlen))
         if(b.isComplete()):
@@ -252,6 +305,8 @@ def main():
                 logger.info('complete but data is 0!')
                 continue
 
+            # if(len(dt) > 11000):
+            #     logger.info('complete! {}'.format(len(dt)))
             if(cmd == Commands.CMD_WRITE_REQUEST):
                 # dt.clear()
                 # dt = bytearray()
@@ -259,19 +314,25 @@ def main():
                 seq_len |= data[1]
                 # dt += data[2:]
                 dt = data[2:]
+                stats[0] = 1
                 logger.info("seq_len:{}".format(seq_len))
                 printx(data[2:])
             elif(cmd == Commands.CMD_WRITE_DATA and len(dt) > 0):
                 msg_seq = data[0] << 8
                 msg_seq |= data[1]
                 dt += data[2:]
-                if((seq_len - msg_seq) < 50):
+                stats[msg_seq] = 1
+                if((seq_len - msg_seq) < 30):
                     logger.info("msg_seq:{}/{}".format(msg_seq, seq_len))
+                    printx(b.getRawData())
                 # logger.info("msg_seq:{}/{}".format(msg_seq, seq_len))
+                # msg = b.create_resp_msg()
+                # ser.write(msg)
             elif(cmd == Commands.CMD_WRITE_DONE and len(dt) > 0):
                 msg_seq = data[0] << 8
                 msg_seq |= data[1]
                 dt += data[2:]
+                stats[msg_seq] = 1
                 logger.info("msg_seq:{}/{}".format(msg_seq, seq_len))
                 logger.info('complete:{}'.format(len(dt)))
                 printx(dt[2:12])
@@ -310,6 +371,13 @@ def main():
                 img.save(fname_j)
                 logger.info("save image:{}".format(fname_j))
 
+                logger.info("stats:")
+                for i in range(0, seq_len):
+                    x = None
+                    if(i in stats):
+                        x = stats[i]
+                    if(x != 1):
+                        logger.info("stats[{}]:{}".format(i, x))
                 dt.clear()
 
     logger.info('end loop!')
