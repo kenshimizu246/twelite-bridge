@@ -2,3 +2,4 @@ config
 data
 logs
 .*.swp
+__pycache__
