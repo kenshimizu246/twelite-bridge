@@ -25,6 +25,8 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+tpe = ThreadPoolExecutor(max_workers=5)
+
 class Commands():
     CMD_HELLO = 0x01
     CMD_WRITE_REQUEST = 0x02
@@ -50,6 +52,41 @@ def printx(d):
             str = ""
     if(len(str) > 0):
         logger.info(str)
+
+def post_django_file(address, fileName):
+    global url
+    logger.info("start post_django: {}".format(address))
+    img_org = cv2.imread(fileName)
+    logger.info("post_django fileName: {} {}".format(fileName, str(img_org)))
+    cv2.imwrite(fileName, img_org)
+    logger.info("post_django wrote fileName: {}".format(fileName))
+    files = { 'file_uploaded': (fileName, open(fileName, 'rb'), 'image/jpeg') }
+    logger.info("url:{}, filename:{}".format(url, fileName))
+    response = requests.post(url, files=files)
+    logger.info("post response:{}".format(response))
+
+def post_django(address, data):
+    global url
+    try:
+        now = datetime.now()
+        write_log("start post_django: {} {} {}".format(address, len(data), os.getcwd()))
+        jpg_as_np = np.frombuffer(bytes(data), dtype=np.uint8)
+        write_log("post_django2: {}".format(jpg_as_np))
+        img_org = cv2.imdecode(jpg_as_np, flags=1)
+        write_log("post_django3")
+        fileName = "{}_{}.jpg".format(address, now.strftime("%m%d%Y_%H%M%S"))
+        if(os.path.exists("data")):
+            fileName = "data/{}".format(fileName)
+        write_log("post_django fileName: {} {}".format(fileName, str(img_org)))
+        # imwrite returns bool
+        ret = cv2.imwrite(fileName, img_org)
+        write_log("post_django wrote fileName: {} {}".format(fileName, ret))
+        files = { 'file_uploaded': (fileName, open(fileName, 'rb'), 'image/jpeg') }
+        write_log("url:{}, filename:{}".format(url, fileName))
+        response = requests.post(url, files=files)
+        write_log("post response:{}".format(response))
+    except Exception as e:
+        write_log("Exception:{}".format(e))
 
 def GenPkt( address, ID, number ):
     ID = ID.lower()
@@ -121,6 +158,15 @@ def create_ext_msg(address, seq, cmd, params, data):
     p += pack('>B', x)
     return p
 
+def create_missing_list(address, stats, seq_len):
+    l = list
+    for i in range(0, seq_len):
+        if(stats[i] < 1):
+            l.append(i)
+    return l
+
+def create_missing_msg(address, missing):
+    return None
 
 def checksum(data):
     x = 0;
@@ -232,6 +278,7 @@ class Buffer:
             
 
 def main():
+    global url
     parser = OptionParser()
     parser.add_option("-z", "--twelite", dest="twelite",
                       help="TWELITE Device path", default='/dev/ttyUSB0')
@@ -370,6 +417,9 @@ def main():
                 fname_j = "{}/image_{}.jpg".format(data_path, ts)
                 img.save(fname_j)
                 logger.info("save image:{}".format(fname_j))
+
+                tpe.submit(post_django_file, 'x', fname_j)
+                # post_django_file('x', fname_j)
 
                 logger.info("stats:")
                 for i in range(0, seq_len):
