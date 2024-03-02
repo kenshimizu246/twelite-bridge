@@ -4,10 +4,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 class Conversation:
-    def __init__(self):
+    def __init__(self, id=0):
         self._seq_len = 0
         self._data_list = {}
         self._last_seq = -1
+        self._id = id
 
     def handler_write_request(self, data):
         sqlen = data[0] << 8
@@ -61,3 +62,5 @@ class Conversation:
                 ll.append(i)
         return ll
 
+    def get_conversation_id(self):
+        return self._id

@@ -1,5 +1,11 @@
 
 from struct import pack
+import logging
+
+import twelite_utils as tu
+
+logger = logging.getLogger(__name__)
+
 
 class Commands():
     CMD_HELLO = 0x01
@@ -74,16 +80,29 @@ def create_ext_msg(address, seq, cmd, params, data):
         p += pack('>B', x)
     if(data):
         p += data
-    x = 0
-    for i in range(0, len(p)):
-        # print("{:#02x}".format(p[i]), end=', ')
-        # print("{}:{:#02x}".format(i, p[i]))
-        if(i > 3):
-            x ^= p[i]
-    print("")
-    print("x:{:#02x}".format(x))
-    p += pack('>B', x)
+    p += pack('>B', tu.checksum(p[4:]))
     return p
+
+# CMD_WRITE_REQUEST_ACK = 0x13
+def create_write_request_ack_msg(self, address, status):
+    cmd = Consts.CMD_WRITE_REQUEST_ACK
+    params = pack('>h', 0)
+    data = pack('>B', status)
+    return create_ext_msg(address, cmd, params, data)
+
+# CMD_WRITE_DATA_ACK = 0x14
+def create_write_data_ack_msg(self, address, seq, status):
+    cmd = Consts.CMD_WRITE_DATA_ACK
+    params = pack('>h', seq)
+    data = pack('>B', status)
+    return create_ext_msg(address, cmd, params, data)
+
+# CMD_WRITE_DONE_ACK = 0x15
+def create_write_done_ack_msg(self, address, seq, status):
+    cmd = Consts.CMD_WRITE_DONE_ACK
+    params = pack('>h', seq)
+    data = pack('>B', status)
+    return create_ext_msg(address, cmd, params, data)
 
 class Buffer:
     def __init__(self):
@@ -140,7 +159,7 @@ class Buffer:
                     self._stat = 'cs' # checksum
             elif(self._stat == 'cs'):
                 self._checksum = x[0]
-                self._checksum_status = (checksum(self._buff[4:]) == x[0])
+                self._checksum_status = (tu.checksum(self._buff[4:]) == x[0])
                 if(not self._checksum_status):
                     logger.info("checksumx:{:#02x}:{:#02x}".format(x[0], self._checksum))
                 self._stat = 'tm'

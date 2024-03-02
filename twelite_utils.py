@@ -1,15 +1,23 @@
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+
 def printx(d):
-    str = ""
+    ss = ""
     cnt = 0
     for x in d:
-        str += "{:#02x}, ".format(x)
+        ss += "{:#02x}, ".format(x)
         cnt += 1
         if((cnt % 10) == 0):
-            logger.info(str)
-            str = ""
-    if(len(str) > 0):
-        logger.info(str)
+            logger.info(ss)
+            print(ss)
+            ss = ""
+    if(len(ss) > 0):
+        logger.info(ss)
+        print(ss)
 
 def checksum(data):
     x = 0;
